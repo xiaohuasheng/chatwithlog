@@ -40,18 +40,20 @@ export function convertAllLog2(nginxLog2, showField) {
 
 
 
-export function convertAllLog(logContent2, showField) {
-    console.log('nginxLog2', logContent2)
-    let logContent = `# Time: 2023-05-02T20:07:41.658728Z
-# User@Host: ones[ones] @  [127.0.0.1]  Id: 975945
-# Query_time: 1.715076  Lock_time: 0.000024 Rows_sent: 278686  Rows_examined: 336258
-SET timestamp=1683058061;
-SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2, user_domain_type, user_domain_param, permission, create_time, status, read_only, position FROM permission_rule WHERE team_uuid='RZxvwUZ8' AND permission IN (1202) AND status=1;
-# Time: 2023-05-02T21:00:01.084358Z
-# User@Host: ones[ones] @  [127.0.0.1]  Id: 975990
-# Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
-SET timestamp=1683061201;
-SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
+export function convertAllLog(code, logContent) {
+    console.log('code', code)
+    console.log('logContent', logContent)
+//     console.log('nginxLog2', logContent2)
+//     let logContent = `# Time: 2023-05-02T20:07:41.658728Z
+// # User@Host: ones[ones] @  [127.0.0.1]  Id: 975945
+// # Query_time: 1.715076  Lock_time: 0.000024 Rows_sent: 278686  Rows_examined: 336258
+// SET timestamp=1683058061;
+// SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2, user_domain_type, user_domain_param, permission, create_time, status, read_only, position FROM permission_rule WHERE team_uuid='RZxvwUZ8' AND permission IN (1202) AND status=1;
+// # Time: 2023-05-02T21:00:01.084358Z
+// # User@Host: ones[ones] @  [127.0.0.1]  Id: 975990
+// # Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
+// SET timestamp=1683061201;
+// SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
     let funcStr = `function parselog(logContent) {
   const State = {
     Start: 0,
@@ -135,8 +137,7 @@ SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_
     let data = parselog(logContent)
 
     console.log('data', data)
-    console.log(showField);
-    return transformData(data, showField)
+    return transformData(data)
 }
 
 // function transformData(data) {
@@ -148,7 +149,7 @@ SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_
 //     });
 //     return {labels, datasets};
 // }
-function transformData(data, showField) {
+function transformData(data) {
     // TODO 需要调一次接口确认时间戳是哪个字段
     const labels = data.map(item => {
         if (item === undefined) {
@@ -158,6 +159,7 @@ function transformData(data, showField) {
         console.log('item.time', item.time)
         return item.time.Value
     });
+    const showField = 'Rows_examined';
     const datasets = Object.keys(data[0]).filter(key => key === showField).map(key => {
         const values = data.map(item => item[key].Value);
         return {
