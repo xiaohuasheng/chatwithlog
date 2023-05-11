@@ -38,7 +38,21 @@ export function convertAllLog2(nginxLog2, showField) {
     return transformData(data, showField)
 }
 
-function parselog(logContent) {
+
+
+export function convertAllLog(logContent2, showField) {
+    console.log('nginxLog2', logContent2)
+    let logContent = `# Time: 2023-05-02T20:07:41.658728Z
+# User@Host: ones[ones] @  [127.0.0.1]  Id: 975945
+# Query_time: 1.715076  Lock_time: 0.000024 Rows_sent: 278686  Rows_examined: 336258
+SET timestamp=1683058061;
+SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2, user_domain_type, user_domain_param, permission, create_time, status, read_only, position FROM permission_rule WHERE team_uuid='RZxvwUZ8' AND permission IN (1202) AND status=1;
+# Time: 2023-05-02T21:00:01.084358Z
+# User@Host: ones[ones] @  [127.0.0.1]  Id: 975990
+# Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
+SET timestamp=1683061201;
+SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
+    let funcStr = `function parselog(logContent) {
   const State = {
     Start: 0,
     Time: 1,
@@ -73,7 +87,7 @@ function parselog(logContent) {
   let state = State.Start;
   let currentResult = {};
 
-  const lines = logContent.split("\n");
+  const lines = logContent.split('\\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     switch (state) {
@@ -115,23 +129,9 @@ function parselog(logContent) {
     }
   }
   return results;
-}
-
-export function convertAllLog(logContent2, showField) {
-    console.log('nginxLog2', logContent2)
-    let logContent = `# Time: 2023-05-02T20:07:41.658728Z
-# User@Host: ones[ones] @  [127.0.0.1]  Id: 975945
-# Query_time: 1.715076  Lock_time: 0.000024 Rows_sent: 278686  Rows_examined: 336258
-SET timestamp=1683058061;
-SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2, user_domain_type, user_domain_param, permission, create_time, status, read_only, position FROM permission_rule WHERE team_uuid='RZxvwUZ8' AND permission IN (1202) AND status=1;
-# Time: 2023-05-02T21:00:01.084358Z
-# User@Host: ones[ones] @  [127.0.0.1]  Id: 975990
-# Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
-SET timestamp=1683061201;
-SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
-    // let funcStr = ``
-    // funcStr = 'return ' + funcStr
-    // let parselog = new Function('logContent', funcStr)()
+}`
+    funcStr = 'return ' + funcStr
+    let parselog = new Function('logContent', funcStr)()
     let data = parselog(logContent)
 
     console.log('data', data)
@@ -154,10 +154,12 @@ function transformData(data, showField) {
         if (item === undefined) {
             return
         }
-        // item.time.value
+        console.log('item', item)
+        console.log('item.time', item.time)
+        return item.time.Value
     });
     const datasets = Object.keys(data[0]).filter(key => key === showField).map(key => {
-        const values = data.map(item => item[key].value);
+        const values = data.map(item => item[key].Value);
         return {
             label: key,
             type: 'line',
