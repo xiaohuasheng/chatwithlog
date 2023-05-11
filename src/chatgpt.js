@@ -2,6 +2,7 @@ import axios from 'axios';
 
 export function getParseCode(message) {
     let param = {'content': message}
+    console.log('axios', axios)
     axios.post('http://task.xiaohuasheng.cc/api/chatgpt', param).then(data => {
         if (data.data.data) {
             console.log(data.data.data)

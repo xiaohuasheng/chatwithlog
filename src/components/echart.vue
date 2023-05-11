@@ -1,4 +1,5 @@
 <template>
+  <input type="file" id="btn" @change="inputChange" multiple/>
   <div id="echarts" style="width: 600px;height:400px;"></div>
 </template>
 
@@ -25,6 +26,25 @@ export default {
     myChart.setOption(option);
   },
   methods: {
+    // 文件上传事件
+    inputChange(e) {
+      const files = e.target.files
+      console.log('files', files)
+      let list = [];
+      for(let i = 0; i < files.length; i++) {
+        const file = files[i]
+        let reader = new FileReader();
+        reader.onload = function(e){
+          const result = e.target.result
+          list.push(result)
+          console.log(result, list)
+
+        };  
+
+        reader.readAsText(file);
+      
+      }
+    },
     getOptions(text, legendData, xAxisData, seriesData) {
       const option = {
         title: {
