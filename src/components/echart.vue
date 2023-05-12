@@ -25,7 +25,7 @@
 <script>
 import * as echarts from 'echarts';
 import { requestChatgpt } from '@/chatgpt'
-import {transformData} from "@/parseNginxLog";
+import {transformMysqlData} from "@/parseNginxLog";
 
 
 
@@ -69,7 +69,7 @@ export default {
     onFieldSelected() {
       console.log(`Selected field: ${this.selectedField}`)
       // do something with the selected field value
-      let chartData = transformData(this.originData, this.selectedField)
+      let chartData = transformMysqlData(this.originData, this.selectedField)
       this.setOption(chartData)
     },
     // 文件上传事件
@@ -77,7 +77,8 @@ export default {
       console.log('inputChange', e)
       const files = e.target.files
       console.log('files', files)
-      let self = this
+
+      const promiseList = []
       for(let i = 0; i < files.length; i++) {
         const file = files[i]
         console.log('file', file)
@@ -86,12 +87,13 @@ export default {
         reader.onload = function(e){
           const fileContent = e.target.result
           let subStr = fileContent.substring(0, 500);
-          requestChatgpt(subStr, fileContent, isMysql ? 'mysql' : 'nginx').then(({ chartData, originData }) => {
-            const field = self.getDataField(originData)
-            self.fields = field
-            self.originData = originData
-            self.setOption(chartData)
-          })
+          promiseList.push(requestChatgpt(subStr, fileContent, isMysql ? 'mysql' : 'nginx'))
+          if (i === files.length) {
+            Promise.All(promiseList).then(res => {
+              console.log('res', res)
+              
+            })
+          }
         };
 
         reader.readAsText(file);

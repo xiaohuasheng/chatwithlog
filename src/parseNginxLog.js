@@ -14,63 +14,77 @@ function extractFunction(str) {
     return str.substring(start, end + 1);
 }
 
-// function parselog(logContent) {
-//     const lines = logContent.split('\\n');
-//     const result = [];
-//     lines.forEach((line) => {
-//         const lineArr = line.split(' ');
-//         if (lineArr.length < 7) {
-//             return;
-//         }
-//         let ip = lineArr[0];
-//         let time = lineArr[3] + ' ' + lineArr[4];
-//         let method = lineArr[5];
-//         let path = lineArr[6];
-//         let status = lineArr[8];
-//         let requestTime = lineArr[lineArr.length - 1];
-//         requestTime = parseFloat(requestTime.replace(/"/g, ''));
-//         if (isNaN(requestTime)) {
-//             return;
-//         }
-//         let resultObj = {
-//             ip: {
-//                 Type: 'string',
-//                 Value: ip
-//             },
-//             time: {
-//                 Type: 'string',
-//                 Value: time
-//             },
-//             method: {
-//                 Type: 'string',
-//                 Value: method + ' ' + path
-//             },
-//             status: {
-//                 Type: 'string',
-//                 Value: status
-//             },
-//             // client: client,
-//             requestTime: {
-//                 Type: 'number',
-//                 Value: requestTime
-//             }
-//         }
-//         result.push(resultObj);
-//     })
-//     return result;
-// }
+function parselog(logContent) {
+    const lines = logContent.split('\\n');
+    const result = [];
+    lines.forEach((line) => {
+        const lineArr = line.split(' ');
+        if (lineArr.length < 7) {
+            return;
+        }
+        let ip = lineArr[0];
+        let time = lineArr[3] + ' ' + lineArr[4];
+        let method = lineArr[5];
+        let path = lineArr[6];
+        let status = lineArr[8];
+        let requestTime = lineArr[lineArr.length - 1];
+        requestTime = parseFloat(requestTime.replace(/"/g, ''));
+        if (isNaN(requestTime)) {
+            return;
+        }
+        let resultObj = {
+            ip: {
+                Type: 'string',
+                Value: ip
+            },
+            time: {
+                Type: 'string',
+                Value: time
+            },
+            method: {
+                Type: 'string',
+                Value: method + ' ' + path
+            },
+            status: {
+                Type: 'string',
+                Value: status
+            },
+            // client: client,
+            requestTime: {
+                Type: 'number',
+                Value: requestTime
+            }
+        }
+        result.push(resultObj);
+    })
+    return result;
+}
 
 export function convertAllLog(code, logContent) {
     code = extractFunction(code)
 
-    let funcStr = 'return ' + code
-    let parselog = new Function('logContent', funcStr)()
+    // let funcStr = 'return ' + code
+    // let parselog = new Function('logContent', funcStr)()
     let data = parselog(logContent)
     return {
-        chartData: transformData(data),
+        chartData: transformMysqlData(data),
         originData: data
     }
 }
+
+// eslint-disable-next-line no-unused-vars
+function convertDateToTimestamp(dateString) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dateParts = dateString.match(/\[(\d{2})\/(\w{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2}) (\+\d{4})\]/);
+    if (!dateParts) {
+      return null; // invalid date string
+    }
+    const monthIndex = months.indexOf(dateParts[2]);
+    const date = new Date(Date.UTC(dateParts[3], monthIndex, dateParts[1], dateParts[4], dateParts[5], dateParts[6]));
+    const timestamp = date.getTime() / 1000; // convert milliseconds to seconds
+    return timestamp;
+  }
 
 function findFirstNumberProperty(obj) {
     for (let prop in obj) {
@@ -81,7 +95,39 @@ function findFirstNumberProperty(obj) {
     return null;
 }
 
-export function transformData(data, showField) {
+export function transformNginxData(data, showField) {
+    // TODO 需要调一次接口确认时间戳是哪个字段
+    if (data.length > 0) {
+        if (showField === undefined) {
+            showField = findFirstNumberProperty(data[0]);
+        }
+    }
+    const labels = data.map(item => {
+        if (item === undefined) {
+            return
+        }
+        if (item.time === undefined) {
+            console.log('time is undefined, item', item)
+            return
+        }
+        return item.time.Value
+    });
+    const datasets = Object.keys(data[0]).filter(key => key === showField).map(key => {
+        const values = data.map(item => item[key].Value);
+        return {
+            label: key,
+            type: 'line',
+            stack: 'Total',
+            data: values
+        };
+    });
+    return {
+        labels,
+        datasets
+    };
+}
+
+export function transformMysqlData(data, showField) {
     // TODO 需要调一次接口确认时间戳是哪个字段
     if (data.length > 0) {
         if (showField === undefined) {
