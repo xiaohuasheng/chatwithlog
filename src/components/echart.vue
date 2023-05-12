@@ -80,15 +80,14 @@ export default {
       let self = this
       for(let i = 0; i < files.length; i++) {
         const file = files[i]
+        console.log('file', file)
+        const isMysql = file.name.includes('mysql')
         let reader = new FileReader();
         reader.onload = function(e){
           const fileContent = e.target.result
           let subStr = fileContent.substring(0, 500);
-          requestChatgpt(subStr, fileContent).then(({ chartData, originData }) => {
-            console.log('chartData', chartData, originData);
-            
+          requestChatgpt(subStr, fileContent, isMysql ? 'mysql' : 'nginx').then(({ chartData, originData }) => {
             const field = self.getDataField(originData)
-            console.log('field', field)
             self.fields = field
             self.originData = originData
             self.setOption(chartData)
