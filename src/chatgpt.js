@@ -26,14 +26,13 @@ export const mysql = `你是一个js函数生成器, 生成js代码来解析ngin
     现在输入是：
     `
 export const nginx = `
-你是一个js函数生成器, 生成js代码来解析nginx, mysql-slow等日志，函数名为parselog，输入为logContent，输出是一个对象数组，你需要识别有哪些字段并命名，对象包含每条日志提取出的字段名，字段类型，字段值，结果只有parselog函数，不需要其他任何回复，不需要解析数据，只是返回函数
+你是一个js函数生成器, 生成js代码来解析nginx日志，注意，你不要解析，返回函数即可，函数名为parselog，输入为logContent，输出是一个对象数组，你需要识别有哪些字段并命名，对象包含每条日志提取出的字段名，字段类型，字段值，结果只有parselog函数，不需要其他任何回复，不需要解析数据，只是返回函数
     例如：
     172.31.0.123 - - [05/May/2023:09:40:00 +0800] "POST /project/api/project/team/RZxvwUZ8/items/graphql?t=group-task-data HTTP/1.0" 200 7227 "https://ones.bangcle.com/project/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36" "106.38.121.194, 172.31.0.123" "1.107"
-    172.31.0.123 - - [05/May/2023:09:40:00 +0800] "GET /project/api/project/team/RZxvwUZ8/queues/list HTTP/1.0" 200 19 "https://ones.bangcle.com/project/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" "106.38.121.194, 172.31.0.123" "0.004"
-    172.31.0.123 - - [05/May/2023:09:40:00 +0800] "GET /project/api/project/team/RZxvwUZ8/notices/info?type=1 HTTP/1.0" 200 500 "https://ones.bangcle.com/project/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36" "106.38.121.194, 172.31.0.123" "0.022"
     你应该返回 function parselog(logContent){const lines=nginxLog.split('\n')const result=[]lines.forEach((line)=>{const lineArr=line.split(' ')if(lineArr.length<7){return}let ip=lineArr[0]let time=lineArr[3]+' '+lineArr[4]let method=lineArr[5]let path=lineArr[6]let status=lineArr[8]let requestTime=lineArr[lineArr.length-1]requestTime=parseFloat(requestTime.replace(/"/g,''))if(isNaN(requestTime)){return}let resultObj={ip:{Type:'string',Value:ip},time:{Type:'string',Value:time},method:{Type:'string',Value:method+' '+path},status:{Type:'string',Value:status},requestTime:{Type:'number',Value:requestTime}}result.push(resultObj)})return result}
 
     现在输入是
+    172.31.0.123 - - [05/May/2023:09:40:00 +0800] "GET /project/api/project/team/RZxvwUZ8/notices/info?type=1 HTTP/1.0" 200 500 "https://ones.bangcle.com/project/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36" "106.38.121.194, 172.31.0.123" "0.022"
 `
 
 const BaseMessageMap = {
