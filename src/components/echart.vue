@@ -1,10 +1,23 @@
 <template>
-  <input type="file" id="btn" @change="inputChange" multiple/>
+  <input style="opacity: 0; position: fixed;" id="file-input" type="file" @change="inputChange" multiple/>
+  <el-button type="primary" @click="btnClick">上传文件</el-button>
   <label for="field-select">Select a field:</label>
-  <select id="field-select" v-model="selectedField" v-on:change="onFieldSelected">
-    <option v-for="field in fields" :value="field" v-bind:key="field">{{ field }}</option>
-  </select>
+  <el-select v-model="selectedField" placeholder="Select" v-on:change="onFieldSelected">
+    <el-option
+      v-for="item in fields"
+      :key="item"
+      :label="item"
+      :value="item"
+    />
+  </el-select>
   <p>You selected: {{ selectedField }}</p>
+  <el-input
+    v-model="textarea"
+    :rows="2"
+    type="textarea"
+    placeholder="Please input"
+    @change="inputTextareaChange"
+  />
   
   <div id="echarts" style="width: 1200px;height:700px;"></div>
 </template>
@@ -23,7 +36,8 @@ export default {
       myChart: null,
       originData: [],
       fields: [],
-      selectedField: ''
+      selectedField: '',
+      textarea: ''
     }
   },
   components: {},
@@ -39,6 +53,13 @@ export default {
     // console.log('result', result)
   },
   methods: {
+    btnClick() {
+      const ele = document.getElementById('file-input')
+      ele.click();
+    },
+    inputTextareaChange(e) {
+      console.log('e', e, e?.target.value)
+    },
     getDataField(data) {
       if (data.length <= 0) {
         return []
