@@ -1,23 +1,26 @@
+
+/* eslint-disable */
+
 <template>
   <input style="opacity: 0; position: fixed;" id="file-input" type="file" @change="inputChange" multiple/>
   <el-button type="primary" @click="btnClick">上传文件</el-button>
-  <label for="field-select">Select a field:</label>
-  <el-select v-model="selectedField" placeholder="Select" v-on:change="onFieldSelected">
-    <el-option
-      v-for="item in fields"
-      :key="item"
-      :label="item"
-      :value="item"
-    />
-  </el-select>
-  <p>You selected: {{ selectedField }}</p>
-  <el-input
-    v-model="textarea"
-    :rows="2"
-    type="textarea"
-    placeholder="Please input"
-    @change="inputTextareaChange"
-  />
+<!--  <label for="field-select">Select a field:</label>-->
+<!--  <el-select v-model="selectedField" placeholder="Select" v-on:change="onFieldSelected">-->
+<!--    <el-option-->
+<!--      v-for="item in fields"-->
+<!--      :key="item"-->
+<!--      :label="item"-->
+<!--      :value="item"-->
+<!--    />-->
+<!--  </el-select>-->
+<!--  <p>You selected: {{ selectedField }}</p>-->
+<!--  <el-input-->
+<!--    v-model="textarea"-->
+<!--    :rows="2"-->
+<!--    type="textarea"-->
+<!--    placeholder="Please input"-->
+<!--    @change="inputTextareaChange"-->
+<!--  />-->
   
   <div id="echarts" style="width: 1200px;height:700px;"></div>
 </template>
@@ -25,7 +28,8 @@
 <script>
 import * as echarts from 'echarts';
 import { requestChatgpt } from '@/chatgpt'
-import {transformMysqlData} from "@/parseNginxLog";
+import {transformMysqlData, findFirstNumberProperty} from "@/parseNginxLog";
+/* eslint-disable */
 
 
 
@@ -72,26 +76,90 @@ export default {
       let chartData = transformMysqlData(this.originData, this.selectedField)
       this.setOption(chartData)
     },
+
+
+    getSerieaData(resList, field) {
+      console.log('resList', resList)
+      let list = []
+      let map = {}
+      resList.forEach(item => {
+        const labels = item.chartData.labels
+        list.push(...labels)
+        map = Object.assign(map, item.chartData.labelMap)
+      })
+      list = list.sort((a, b) => a.split('-')[1] - b.split('-')[1])
+      const mysqlValue = []
+      const nginxValue = []
+      console.log('list', list)
+      list.forEach((item) => {
+        if (!field) {
+          field = findFirstNumberProperty(map[item])
+        }
+        console.log('field', field, item, map[item])
+        mysqlValue.push(map[item][field]?.Value || 0)
+        nginxValue.push(map[item][field]?.Value || 0)
+      })
+      function formatDate(time) {
+        const d = new Date(time * 1000)
+        const yy = d.getFullYear()
+        const mm = d.getMonth() + 1
+        const dd = d.getDate()
+
+        const hh = d.getHours()
+        const m = d.getMinutes()
+        const ss = d.getSeconds();
+        const fill = (value) => {
+          return value < 10 ? `0${value}` : value
+        }
+
+
+        return `${yy}-${fill(mm)}-${fill(dd)} ${fill(hh)}:${fill(m)}:${fill(ss)}`
+      }
+      const xAxisData = list.map(item => {
+        const time = item.split('-')[1]
+        return formatDate(time)
+      })
+
+      return {
+        xAxisData,
+        mysqlValue,
+        nginxValue
+      }
+    },
+
     // 文件上传事件
     inputChange(e) {
-      console.log('inputChange', e)
       const files = e.target.files
-      console.log('files', files)
-
+      let self = this
       const promiseList = []
       for(let i = 0; i < files.length; i++) {
         const file = files[i]
-        console.log('file', file)
         const isMysql = file.name.includes('mysql')
         let reader = new FileReader();
         reader.onload = function(e){
           const fileContent = e.target.result
           let subStr = fileContent.substring(0, 500);
           promiseList.push(requestChatgpt(subStr, fileContent, isMysql ? 'mysql' : 'nginx'))
-          if (i === files.length) {
-            Promise.All(promiseList).then(res => {
-              console.log('res', res)
-              
+          if (i === files.length - 1) {
+            Promise.all(promiseList).then(resList => {
+              const { mysqlValue, nginxValue, xAxisData } = self.getSerieaData(resList)
+              const seriesData = [
+                  {
+                    name: 'mysql',
+                    type: 'line',
+                    stack: 'Total',
+                    data: mysqlValue,
+                  },
+                  {
+                    name: 'nginx',
+                    type: 'line',
+                    stack: 'Total',
+                    data: nginxValue,
+                  },
+              ]
+              const option = self.getOptions('日志分析图表', xAxisData, seriesData)
+
+              self.myChart.setOption(option);
             })
           }
         };
@@ -99,7 +167,7 @@ export default {
         reader.readAsText(file);
       }
     },
-    getOptions(text, legendData, xAxisData, seriesData) {
+    getOptions(text, xAxisData, seriesData) {
       const option = {
         title: {
           text: text || 'Line'
@@ -108,7 +176,7 @@ export default {
           trigger: 'axis'
         },
         legend: {
-          data: legendData || ['Email', 'Union Ads', 'Video Ads', 'Direct', 'Search Engine']
+          data: ['mysql', 'nginx']
         },
         grid: {
           left: '3%',
@@ -124,7 +192,7 @@ export default {
         xAxis: {
           type: 'category',
           boundaryGap: false,
-          data: xAxisData || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          data: xAxisData
         },
         yAxis: {
           type: 'value'

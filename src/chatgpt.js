@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import axios from 'axios';
 import FormData from "form-data";
 import {convertAllLog} from '@/parseNginxLog'
@@ -39,6 +41,156 @@ const BaseMessageMap = {
     nginx
 }
 
+function extractFunction(str) {
+    // 查找第一个 function 的位置
+    const start = str.indexOf('function');
+    if (start === -1) {
+        // 如果字符串中没有 function，返回空字符串
+        return '';
+    }
+
+    const end = str.lastIndexOf('}');
+    if (end === -1) {
+        // 如果字符串中没有 }，返回空字符串
+        return '';
+    }
+    return str.substring(start, end + 1);
+}
+
+
+function parseNginxlog(logContent) {
+    const lines = logContent.split('\\n');
+    const result = [];
+    lines.forEach((line) => {
+        const lineArr = line.split(' ');
+        if (lineArr.length < 7) {
+            return;
+        }
+        let ip = lineArr[0];
+        let time = lineArr[3] + ' ' + lineArr[4];
+        let method = lineArr[5];
+        let path = lineArr[6];
+        let status = lineArr[8];
+        let requestTime = lineArr[lineArr.length - 1];
+        requestTime = parseFloat(requestTime.replace(/"/g, ''));
+        if (isNaN(requestTime)) {
+            return;
+        }
+        let resultObj = {
+            ip: {
+                Type: 'string',
+                Value: ip
+            },
+            time: {
+                Type: 'string',
+                Value: time
+            },
+            method: {
+                Type: 'string',
+                Value: method + ' ' + path
+            },
+            status: {
+                Type: 'string',
+                Value: status
+            },
+            // client: client,
+            requestTime: {
+                Type: 'number',
+                Value: requestTime
+            }
+        }
+        result.push(resultObj);
+    })
+    return result;
+}
+
+function parseMysqllog(logContent) {
+    const State = {
+        Start: 0,
+        Time: 1,
+        User: 2,
+        Host: 3,
+        Id: 4,
+        QueryTime: 5,
+        LockTime: 6,
+        RowsSent: 7,
+        RowsExamined: 8,
+        Timestamp: 9,
+        Sql: 10,
+    };
+
+    function parseQueryTime(logLine) {
+        const aMap = {};
+        const queryTimeParts = logLine.substring("# Query_time: ".length).split("  Lock_time: ");
+        const queryTime = queryTimeParts[0];
+        const lockTimeParts = queryTimeParts[1].split("Rows_sent: ");
+        const lockTime = lockTimeParts[0].trim();
+        const rowsParts = lockTimeParts[1].split("Rows_examined: ");
+        const rowsSent = rowsParts[0].trim();
+        const rowsExamined = rowsParts[1].trim();
+        aMap["Query_time"] = {Type: "number", Value: queryTime};
+        aMap["Lock_time"] = {Type: "number", Value: lockTime};
+        aMap["Rows_sent"] = {Type: "number", Value: rowsSent};
+        aMap["Rows_examined"] = {Type: "number", Value: rowsExamined};
+        return aMap
+    }
+
+    const results = [];
+    let state = State.Start;
+    let currentResult = {};
+    const lines = logContent.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        switch (state) {
+            case State.Start:
+                if (line.startsWith("# Time: ")) {
+                    state = State.Time;
+                    currentResult = {};
+                    currentResult["time"] = {Type: "string", Value: line.substring("# Time: ".length)}
+                }
+                break;
+            case State.Time:
+                if (line.startsWith("# User@Host: ")) {
+                    state = State.User;
+                    const parts = line.substring("# User@Host: ".length).split("  Id: ");
+                    currentResult["User"] = {Type: "string", Value: parts[0]};
+                    currentResult["Host"] = {Type: "string", Value: parts[1]}
+                }
+                break;
+            case State.User:
+                if (line.startsWith("# Query_time: ")) {
+                    state = State.QueryTime;
+                    const queryTimeMap = parseQueryTime(line);
+                    currentResult = {...currentResult, ...queryTimeMap}
+                }
+                break;
+            case State.QueryTime:
+                if (line.startsWith("SET timestamp=")) {
+                    state = State.Timestamp;
+                    currentResult["timestamp"] = {
+                        Type: "number",
+                        Value: parseInt(line.substring("SET timestamp=".length))
+                    }
+                }
+                break;
+            case State.Timestamp:
+                if (line.trim() !== "") {
+                    state = State.Start;
+                    currentResult["sql"] = {Type: "string", Value: line};
+                    results.push(currentResult)
+                }
+                break
+        }
+    }
+    return results
+}
+
+const parseMap = {
+    nginx: parseNginxlog,
+    mysql: parseMysqllog,
+}
+
+
 
 export const requestChatgpt = (subStr, fileContent, baseMessage = 'mysql') => {
     return new Promise((resolve, reject) => {
@@ -52,13 +204,18 @@ export const requestChatgpt = (subStr, fileContent, baseMessage = 'mysql') => {
         data.append('content', content);
 
         var config = {
-        method: 'post',
-        url: baseURL + '/api/chatgpt',
-        headers: {
-            'Cookie': 'beegosessionID=018d39ffedf3de285eed2099cb1d751d; language=zh'
-        },
-        data: data
+            method: 'post',
+            url: baseURL + '/api/chatgpt',
+            headers: {
+                'Cookie': 'beegosessionID=018d39ffedf3de285eed2099cb1d751d; language=zh'
+            },
+            data: data
         };
+        // setTimeout(() => {
+        //     console.log('fileContent', fileContent)
+        //
+        // }, 100)
+
 
         axios(config).then(function (response) {
             if (response.data.code !== 0) {
@@ -69,16 +226,16 @@ export const requestChatgpt = (subStr, fileContent, baseMessage = 'mysql') => {
                 console.log('没有返回数据');
                 return;
             }
-            // const code = response.data.data;
-            const code = `function parselog(logContent){const State={Start:0,Time:1,User:2,Host:3,Id:4,QueryTime:5,LockTime:6,RowsSent:7,RowsExamined:8,Timestamp:9,Sql:10,};function parseQueryTime(logLine){const aMap={};const queryTimeParts=logLine.substring("# Query_time: ".length).split("  Lock_time: ");const queryTime=queryTimeParts[0];const lockTimeParts=queryTimeParts[1].split("Rows_sent: ");const lockTime=lockTimeParts[0].trim();const rowsParts=lockTimeParts[1].split("Rows_examined: ");const rowsSent=rowsParts[0].trim();const rowsExamined=rowsParts[1].trim();aMap["Query_time"]={Type:"number",Value:queryTime};aMap["Lock_time"]={Type:"number",Value:lockTime};aMap["Rows_sent"]={Type:"number",Value:rowsSent};aMap["Rows_examined"]={Type:"number",Value:rowsExamined};return aMap}const results=[];let state=State.Start;let currentResult={};const lines=logContent.split('\\n');for(let i=0;i<lines.length;i++){const line=lines[i];switch(state){case State.Start:if(line.startsWith("# Time: ")){state=State.Time;currentResult={};currentResult["time"]={Type:"string",Value:line.substring("# Time: ".length)}}break;case State.Time:if(line.startsWith("# User@Host: ")){state=State.User;const parts=line.substring("# User@Host: ".length).split("  Id: ");currentResult["User"]={Type:"string",Value:parts[0]};currentResult["Host"]={Type:"string",Value:parts[1]}}break;case State.User:if(line.startsWith("# Query_time: ")){state=State.QueryTime;const queryTimeMap=parseQueryTime(line);currentResult={...currentResult,...queryTimeMap}}break;case State.QueryTime:if(line.startsWith("SET timestamp=")){state=State.Timestamp;currentResult["timestamp"]={Type:"number",Value:parseInt(line.substring("SET timestamp=".length))}}break;case State.Timestamp:if(line.trim()!==""){state=State.Start;currentResult["sql"]={Type:"string",Value:line};results.push(currentResult)}break}}return results}            `
-            
-            let result = convertAllLog(code, fileContent)
+            const code = response.data.data;
+            // const code = `function parselog(logContent){const State={Start:0,Time:1,User:2,Host:3,Id:4,QueryTime:5,LockTime:6,RowsSent:7,RowsExamined:8,Timestamp:9,Sql:10,};function parseQueryTime(logLine){const aMap={};const queryTimeParts=logLine.substring("# Query_time: ".length).split("  Lock_time: ");const queryTime=queryTimeParts[0];const lockTimeParts=queryTimeParts[1].split("Rows_sent: ");const lockTime=lockTimeParts[0].trim();const rowsParts=lockTimeParts[1].split("Rows_examined: ");const rowsSent=rowsParts[0].trim();const rowsExamined=rowsParts[1].trim();aMap["Query_time"]={Type:"number",Value:queryTime};aMap["Lock_time"]={Type:"number",Value:lockTime};aMap["Rows_sent"]={Type:"number",Value:rowsSent};aMap["Rows_examined"]={Type:"number",Value:rowsExamined};return aMap}const results=[];let state=State.Start;let currentResult={};const lines=logContent.split('\\n');for(let i=0;i<lines.length;i++){const line=lines[i];switch(state){case State.Start:if(line.startsWith("# Time: ")){state=State.Time;currentResult={};currentResult["time"]={Type:"string",Value:line.substring("# Time: ".length)}}break;case State.Time:if(line.startsWith("# User@Host: ")){state=State.User;const parts=line.substring("# User@Host: ".length).split("  Id: ");currentResult["User"]={Type:"string",Value:parts[0]};currentResult["Host"]={Type:"string",Value:parts[1]}}break;case State.User:if(line.startsWith("# Query_time: ")){state=State.QueryTime;const queryTimeMap=parseQueryTime(line);currentResult={...currentResult,...queryTimeMap}}break;case State.QueryTime:if(line.startsWith("SET timestamp=")){state=State.Timestamp;currentResult["timestamp"]={Type:"number",Value:parseInt(line.substring("SET timestamp=".length))}}break;case State.Timestamp:if(line.trim()!==""){state=State.Start;currentResult["sql"]={Type:"string",Value:line};results.push(currentResult)}break}}return results}            `
+            eval(extractFunction(code))
+            let result = convertAllLog('code', fileContent, parseMap[baseMessage], baseMessage)
             resolve(result)
         })
-        .catch(function (error) {
-            console.log(error);
-            reject(error)
-        });
+            .catch(function (error) {
+                console.log(error);
+                reject(error)
+            });
     })
-    
+
 }
