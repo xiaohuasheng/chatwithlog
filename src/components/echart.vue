@@ -1,5 +1,10 @@
 <template>
   <input type="file" id="btn" @change="inputChange" multiple/>
+  <label for="field-select">Select a field:</label>
+  <select id="field-select" v-model="selectedField" v-on:change="onFieldSelected">
+    <option v-for="field in fields" :value="field" v-bind:key="field">{{ field }}</option>
+  </select>
+  <p>You selected: {{ selectedField }}</p>
   
   <div id="echarts" style="width: 1200px;height:700px;"></div>
 </template>
@@ -7,6 +12,7 @@
 <script>
 import * as echarts from 'echarts';
 import { requestChatgpt } from '@/chatgpt'
+import {transformData} from "@/parseNginxLog";
 
 
 
@@ -16,7 +22,8 @@ export default {
     return {
       myChart: null,
       originData: [],
-      field: []
+      fields: [],
+      selectedField: ''
     }
   },
   components: {},
@@ -38,6 +45,12 @@ export default {
       }
       return Object.keys(data[0])
     },
+    onFieldSelected() {
+      console.log(`Selected field: ${this.selectedField}`)
+      // do something with the selected field value
+      let chartData = transformData(this.originData, this.selectedField)
+      this.setOption(chartData)
+    },
     // 文件上传事件
     inputChange(e) {
       console.log('inputChange', e)
@@ -55,7 +68,7 @@ export default {
             
             const field = self.getDataField(originData)
             console.log('field', field)
-            self.field = field
+            self.fields = field
             self.originData = originData
             self.setOption(chartData)
           })
