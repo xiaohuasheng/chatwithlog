@@ -56,103 +56,21 @@ function extractFunction(str) {
 
 
 export function convertAllLog(code, logContent) {
-    console.log('code', code)
     code = extractFunction(code)
-    console.log('code after extract', code)
-    console.log('logContent', logContent)
-//     console.log('nginxLog2', logContent2)
-//     let logContent = `# Time: 2023-05-02T20:07:41.658728Z
-// # User@Host: ones[ones] @  [127.0.0.1]  Id: 975945
-// # Query_time: 1.715076  Lock_time: 0.000024 Rows_sent: 278686  Rows_examined: 336258
-// SET timestamp=1683058061;
-// SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2, user_domain_type, user_domain_param, permission, create_time, status, read_only, position FROM permission_rule WHERE team_uuid='RZxvwUZ8' AND permission IN (1202) AND status=1;
-// # Time: 2023-05-02T21:00:01.084358Z
-// # User@Host: ones[ones] @  [127.0.0.1]  Id: 975990
-// # Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
-// SET timestamp=1683061201;
-// SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
-//     let funcStr = `function parselog(logContent) {
-//     const State = {
-//         Start: 0, Time: 1, UserHost: 2, Id: 3, QueryTime: 4, LockTime: 5, RowsSent: 6, RowsExamined: 7, Timestamp: 8, Sql: 9,
-//     };
-//     const results = [];
-//     let state = State.Start;
-//     let currentResult = {};
-//     const lines = logContent.split('\\n');
-//
-//     for (let i = 0; i < lines.length; i++) {
-//         const line = lines[i];
-//
-//         switch (state) {
-//             case State.Start:
-//                 if (line.startsWith("# Time: ")) {
-//                     state = State.Time;
-//                     currentResult = {};
-//                     currentResult["time"] = { Type: "string", Value: line.substring("# Time: ".length) }
-//                 }
-//                 break;
-//
-//             case State.Time:
-//                 if (line.startsWith("# User@Host: ")) {
-//                     state = State.UserHost;
-//                     const userHostParts = line.substring("# User@Host: ".length).split(" Id: ");
-//                     currentResult["UserHost"] = { Type: "string", Value: userHostParts[0] };
-//                     currentResult["Id"] = { Type: "string", Value: userHostParts[1] }
-//                 }
-//                 break;
-//
-//             case State.UserHost:
-//                 if (line.startsWith("# Query_time: ")) {
-//                     state = State.QueryTime;
-//                     const queryTimeParts = line.split(" ");
-//                     currentResult["Query_time"] = { Type: "number", Value: parseFloat(queryTimeParts[2]) };
-//                     currentResult["Lock_time"] = { Type: "number", Value: parseFloat(queryTimeParts[5]) };
-//                     currentResult["Rows_sent"] = { Type: "number", Value: parseFloat(queryTimeParts[7]) };
-//                     currentResult["Rows_examined"] = { Type: "number", Value: parseFloat(queryTimeParts[9]) };
-//                 }
-//                 break;
-//
-//             case State.QueryTime:
-//                 if (line.startsWith("SET timestamp=")) {
-//                     state = State.Timestamp;
-//                     currentResult["timestamp"] = { Type: "number", Value: parseInt(line.substring("SET timestamp=".length)) }
-//                 }
-//                 break;
-//
-//             case State.Timestamp:
-//                 if (line.trim() !== "") {
-//                     state = State.Start;
-//                     currentResult["sql"] = { Type: "string", Value: line };
-//                     results.push(currentResult);
-//                 }
-//                 break;
-//         }
-//     }
-//
-//     return results;
-// }`
-//     funcStr = 'return ' + funcStr
+
     let funcStr = 'return ' + code
-    console.log('funcStr', funcStr)
     let parselog = new Function('logContent', funcStr)()
     let data = parselog(logContent)
 
     console.log('data', data)
-    return transformData(data)
+    return {
+        chartData: transformData(data),
+        originData: data
+    }
 }
 
-// function transformData(data) {
-//     const labels = data.map(item => item.time.value);
-//     const datasets = Object.keys(data[0]).map(key => {
-//         const label = key;
-//         const dataValues = data.map(item => item[key].value);
-//         return {label, data: dataValues};
-//     });
-//     return {labels, datasets};
-// }
-function transformData(data) {
+export function transformData(data, showField = 'Rows_examined') {
     // TODO 需要调一次接口确认时间戳是哪个字段
-    let showField = 'Rows_examined';
     const labels = data.map(item => {
         if (item === undefined) {
             return
@@ -181,6 +99,9 @@ function transformData(data) {
         datasets
     };
 }
+
+
+
 
 /*
   let data = [
