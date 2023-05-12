@@ -38,10 +38,27 @@ export function convertAllLog2(nginxLog2, showField) {
     return transformData(data, showField)
 }
 
+function extractFunction(str) {
+    // 查找第一个 function 的位置
+    const start = str.indexOf('function');
+    if (start === -1) {
+        // 如果字符串中没有 function，返回空字符串
+        return '';
+    }
+
+    const end = str.lastIndexOf('}');
+    if (end === -1) {
+        // 如果字符串中没有 }，返回空字符串
+        return '';
+    }
+    return str.substring(start, end + 1);
+}
 
 
 export function convertAllLog(code, logContent) {
     console.log('code', code)
+    code = extractFunction(code)
+    console.log('code after extract', code)
     console.log('logContent', logContent)
 //     console.log('nginxLog2', logContent2)
 //     let logContent = `# Time: 2023-05-02T20:07:41.658728Z
@@ -54,85 +71,69 @@ export function convertAllLog(code, logContent) {
 // # Query_time: 1.064522  Lock_time: 0.000029 Rows_sent: 0  Rows_examined: 62561
 // SET timestamp=1683061201;
 // SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM \`task\` WHERE LEFT(create_time, 10) >= 1682956800 AND LEFT(create_time, 10) <= 1683043199 GROUP BY \`team_uuid\`;`
-    let funcStr = `function parselog(logContent) {
-  const State = {
-    Start: 0,
-    Time: 1,
-    User: 2,
-    Host: 3,
-    Id: 4,
-    QueryTime: 5,
-    LockTime: 6,
-    RowsSent: 7,
-    RowsExamined: 8,
-    Timestamp: 9,
-    Sql: 10,
-  };
-
-  function parseQueryTime(logLine) {
-    const aMap = {};
-    const queryTimeParts = logLine.substring("# Query_time: ".length).split("  Lock_time: ");
-    const queryTime = queryTimeParts[0];
-    const lockTimeParts = queryTimeParts[1].split("Rows_sent: ");
-    const lockTime = lockTimeParts[0].trim();
-    const rowsParts = lockTimeParts[1].split("Rows_examined: ");
-    const rowsSent = rowsParts[0].trim();
-    const rowsExamined = rowsParts[1].trim();
-    aMap["Query_time"] = { Type: "number", Value: queryTime };
-    aMap["Lock_time"] = { Type: "number", Value: lockTime };
-    aMap["Rows_sent"] = { Type: "number", Value: rowsSent };
-    aMap["Rows_examined"] = { Type: "number", Value: rowsExamined };
-    return aMap;
-  }
-
-  const results = [];
-  let state = State.Start;
-  let currentResult = {};
-
-  const lines = logContent.split('\\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    switch (state) {
-      case State.Start:
-        if (line.startsWith("# Time: ")) {
-          state = State.Time;
-          currentResult = {};
-          currentResult["time"] = { Type: "string", Value: line.substring("# Time: ".length) };
-        }
-        break;
-      case State.Time:
-        if (line.startsWith("# User@Host: ")) {
-          state = State.User;
-          const parts = line.substring("# User@Host: ".length).split("  Id: ");
-          currentResult["User"] = { Type: "string", Value: parts[0] };
-          currentResult["Host"] = { Type: "string", Value: parts[1] };
-        }
-        break;
-      case State.User:
-        if (line.startsWith("# Query_time: ")) {
-          state = State.QueryTime;
-          const queryTimeMap = parseQueryTime(line);
-          currentResult = { ...currentResult, ...queryTimeMap };
-        }
-        break;
-      case State.QueryTime:
-        if (line.startsWith("SET timestamp=")) {
-          state = State.Timestamp;
-          currentResult["timestamp"] = { Type: "number", Value: parseInt(line.substring("SET timestamp=".length)) };
-        }
-        break;
-      case State.Timestamp:
-        if (line.trim() !== "") {
-          state = State.Start;
-          currentResult["sql"] = { Type: "string", Value: line };
-          results.push(currentResult);
-        }
-        break;
-    }
-  }
-  return results;
-}`
-    funcStr = 'return ' + funcStr
+//     let funcStr = `function parselog(logContent) {
+//     const State = {
+//         Start: 0, Time: 1, UserHost: 2, Id: 3, QueryTime: 4, LockTime: 5, RowsSent: 6, RowsExamined: 7, Timestamp: 8, Sql: 9,
+//     };
+//     const results = [];
+//     let state = State.Start;
+//     let currentResult = {};
+//     const lines = logContent.split('\\n');
+//
+//     for (let i = 0; i < lines.length; i++) {
+//         const line = lines[i];
+//
+//         switch (state) {
+//             case State.Start:
+//                 if (line.startsWith("# Time: ")) {
+//                     state = State.Time;
+//                     currentResult = {};
+//                     currentResult["time"] = { Type: "string", Value: line.substring("# Time: ".length) }
+//                 }
+//                 break;
+//
+//             case State.Time:
+//                 if (line.startsWith("# User@Host: ")) {
+//                     state = State.UserHost;
+//                     const userHostParts = line.substring("# User@Host: ".length).split(" Id: ");
+//                     currentResult["UserHost"] = { Type: "string", Value: userHostParts[0] };
+//                     currentResult["Id"] = { Type: "string", Value: userHostParts[1] }
+//                 }
+//                 break;
+//
+//             case State.UserHost:
+//                 if (line.startsWith("# Query_time: ")) {
+//                     state = State.QueryTime;
+//                     const queryTimeParts = line.split(" ");
+//                     currentResult["Query_time"] = { Type: "number", Value: parseFloat(queryTimeParts[2]) };
+//                     currentResult["Lock_time"] = { Type: "number", Value: parseFloat(queryTimeParts[5]) };
+//                     currentResult["Rows_sent"] = { Type: "number", Value: parseFloat(queryTimeParts[7]) };
+//                     currentResult["Rows_examined"] = { Type: "number", Value: parseFloat(queryTimeParts[9]) };
+//                 }
+//                 break;
+//
+//             case State.QueryTime:
+//                 if (line.startsWith("SET timestamp=")) {
+//                     state = State.Timestamp;
+//                     currentResult["timestamp"] = { Type: "number", Value: parseInt(line.substring("SET timestamp=".length)) }
+//                 }
+//                 break;
+//
+//             case State.Timestamp:
+//                 if (line.trim() !== "") {
+//                     state = State.Start;
+//                     currentResult["sql"] = { Type: "string", Value: line };
+//                     results.push(currentResult);
+//                 }
+//                 break;
+//         }
+//     }
+//
+//     return results;
+// }`
+//     funcStr = 'return ' + funcStr
+    let funcStr = 'return ' + code
+    console.log('funcStr', funcStr)
     let parselog = new Function('logContent', funcStr)()
     let data = parselog(logContent)
 
@@ -151,15 +152,21 @@ export function convertAllLog(code, logContent) {
 // }
 function transformData(data) {
     // TODO 需要调一次接口确认时间戳是哪个字段
+    let showField = 'Rows_examined';
     const labels = data.map(item => {
         if (item === undefined) {
             return
         }
-        console.log('item', item)
-        console.log('item.time', item.time)
+        if (item.time === undefined) {
+            console.log('time is undefined, item', item)
+            return
+        }
+        // 是否是 NaN
+        if (isNaN(item.Rows_examined.Value)) {
+            showField = 'Rows_sent'
+        }
         return item.time.Value
     });
-    const showField = 'Rows_examined';
     const datasets = Object.keys(data[0]).filter(key => key === showField).map(key => {
         const values = data.map(item => item[key].Value);
         return {

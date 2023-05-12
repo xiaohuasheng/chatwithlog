@@ -1,6 +1,6 @@
 <template>
   <input type="file" id="btn" @change="inputChange" multiple/>
-  <div id="echarts" style="width: 600px;height:400px;"></div>
+  <div id="echarts" style="width: 1200px;height:700px;"></div>
 </template>
 
 <script>
@@ -61,6 +61,8 @@ SELECT uuid, team_uuid, org_uuid, context_type, context_param_1, context_param_2
           const baseURL = "http://task.xiaohuasheng.cc"
           // const baseURL = "http://localhost:9091"
           var data = new FormData();
+          // data.append('model', 'gpt-4');
+          data.append('model', 'gpt-3.5-turbo');
           data.append('content', content);
 
           var config = {
