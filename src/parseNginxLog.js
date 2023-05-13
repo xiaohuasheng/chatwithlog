@@ -56,7 +56,8 @@ function convertDateToTimestamp(dateString) {
     }
     const monthIndex = months.indexOf(dateParts[2]);
     const date = new Date(Date.UTC(dateParts[3], monthIndex, dateParts[1], dateParts[4], dateParts[5], dateParts[6]));
-    const timestamp = date.getTime() / 1000; // convert milliseconds to seconds
+    let timestamp = date.getTime() / 1000; // convert milliseconds to seconds
+    timestamp = timestamp - 8 * 60 * 60; // convert UTC time to Beijing time
     return timestamp;
 }
 
@@ -111,6 +112,7 @@ export function transformMysqlData(data, showField) {
         if (item.time === undefined) {
             return
         }
+        // labelMap[`mysql-${item.timestamp.Value + 28800}`] = item
         labelMap[`mysql-${item.timestamp.Value}`] = item
         return `mysql-${item.timestamp.Value}`
     });
@@ -135,12 +137,55 @@ const transformDataMap = {
     mysql: transformMysqlData,
 }
 
+
+function parselog(logContent){
+    const lines=logContent.split('\n');
+    const result=[];
+
+    lines.forEach((line)=>{
+        const lineArr=line.split(' ');
+        if(lineArr.length<7){return}
+
+        let ip=lineArr[0];
+        let time=lineArr[3]+' '+lineArr[4];
+        let method=lineArr[5].replace(/"/g,'');
+        let path=lineArr[6];
+        let status=lineArr[8];
+        let referer=lineArr[10].replace(/"/g,'');
+        let userAgent=lineArr.slice(11,lineArr.length-2).join(' ').replace(/"/g,'');
+        let remoteAddr=lineArr[lineArr.length-2];
+        let requestTime=lineArr[lineArr.length-1].replace(/"/g,'');
+        requestTime=parseFloat(requestTime);
+        if(isNaN(requestTime)){return}
+
+        let resultObj={
+            ip: {Type:'string', Value:ip},
+            time: {Type:'string', Value:time},
+            method: {Type:'string', Value:method},
+            path: {Type:'string', Value:path},
+            status: {Type:'string', Value:status},
+            referer: {Type:'string', Value:referer},
+            userAgent: {Type:'string', Value:userAgent},
+            remoteAddr: {Type:'string', Value:remoteAddr},
+            requestTime: {Type:'number', Value:requestTime},
+        };
+
+        result.push(resultObj);
+    })
+
+    return result;
+}
+
 export function convertAllLog(code, logContent, callback, baseMessage) {
     // code = extractFunction(code)
 
     // let funcStr = 'return ' + code
     // let parselog = new Function('logContent', funcStr)()
     let data = callback(logContent)
+    if (baseMessage === 'nginx') {
+        data = parselog(logContent)
+    }
+    console.log('data', data)
     const transformData = transformDataMap[baseMessage]
     return {
         chartData: transformData(data),

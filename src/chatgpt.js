@@ -202,6 +202,7 @@ export const requestChatgpt = (subStr, fileContent, baseMessage = 'mysql') => {
         // data.append('model', 'gpt-4');
         data.append('model', 'gpt-3.5-turbo');
         data.append('content', content);
+        data.append('logType', baseMessage);
 
         var config = {
             method: 'post',

@@ -47,3 +47,4 @@ SELECT team_uuid,COUNT(DISTINCT owner) AS count FROM `task` WHERE LEFT(create_ti
 
 
 
+
